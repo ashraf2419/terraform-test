@@ -1,0 +1,54 @@
+name: Validate Terraform AWS Skeleton Network
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate-terraform:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v2
+
+    - name: Set up AWS CLI
+      run: |
+        echo "$AWS_ACCESS_KEY_ID_FEDERAL" > aws_access_key_id
+        echo "$AWS_SECRET_ACCESS_KEY_ID_FEDERAL" > aws_secret_access_key
+        aws configure set aws_access_key_id $(cat aws_access_key_id)
+        aws configure set aws_secret_access_key $(cat aws_secret_access_key)
+        aws configure set default.region "ap-south-1"
+      env:
+        AWS_ACCESS_KEY_ID_FEDERAL: ${{ secrets.AWS_ACCESS_KEY_ID_FEDERAL }}
+        AWS_SECRET_ACCESS_KEY_ID_FEDERAL: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID_FEDERAL }}
+
+    - name: Replace Variables in Terraform Files
+      run: |
+        sed -i 's/\$PROJECT_NAME'"/$TERRA_PROJECT_NAME/g" aws-network/s3-dynomo-backend.tf
+        sed -i 's/\$GIT_TERRAFORM_USER'"/$TF_VAR_GIT_TERRAFORM_USER/g" aws-network/infra.tf
+        sed -i 's/\$GIT_TERRAFORM_PASSWORD'"/$TF_VAR_GIT_TERRAFORM_PASSWORD/g" aws-network/infra.tf
+        sed -i 's/\$PROJECT_NAME'"/$TERRA_PROJECT_NAME/g" aws-network/terraform.tfvars
+        sed -i 's/\$PROJECT_NAME'"/$TERRA_PROJECT_NAME/g" aws-network/infra.tf
+
+    - name: Display Modified Terraform Files
+      run: |
+        cat aws-network/s3-dynomo-backend.tf
+        cat aws-network/infra.tf
+        cat aws-network/terraform.tfvars
+
+    - name: Install and Configure AWS CLI
+      run: |
+        sudo apt-get -y install awscli
+      if: runner.os == 'Linux'
+
+    - name: Initialize Terraform
+      run: |
+        cd aws-network
+        terraform init
+
+    - name: Validate Terraform Configuration
+      run: |
+        cd aws-network
+        terraform validate
